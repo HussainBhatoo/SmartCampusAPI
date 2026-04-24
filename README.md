@@ -1,2 +1,217 @@
 # SmartCampusAPI
 Scenario: You have been appointed as the Lead Backend Architect for the university’s ”Smart Campus” initiative. What began as a pilot project for tracking individual tempera- ture sensors has evolved into a comprehensive campus-wide infrastructure project. The university now requires a robust, scalable, and highly available RESTful API.
+1. API Design Overview
+For this project, I went with a layered architecture to keep the business logic separate from the data storage. I used JAX-RS to build out
+the endpoints and handled the data using a DAO (Data Access Object) pattern. Everything is stored in-memory using a singleton Storage class,
+which makes the API fast and easy to test without needing a full database setup.
+
+The structure is set up hierarchically: Rooms are the main containers, Sensors live inside those rooms, and Readings are nested under the sensors.
+I also built a Discovery endpoint using HATEOAS, so the API actually tells the client what they can do next by providing links in the JSON responses.
+It makes the whole system feel way more professional and easier to navigate.
+
+
+
+
+2. Build and Launch Instructions
+To get the project up and running on your machine, just follow these steps:
+
+Clone the Repo: Open your terminal and run:
+git clone https://github.com/HussainBhatoo/SmartCampusAPI.git
+
+Import to NetBeans: Open NetBeans and select "Open Project." Navigate to the folder you just cloned. Since it’s a Maven project, NetBeans will handle
+the dependencies for you.
+
+Build it: Right-click the project and hit "Clean and Build". This generates the .war file you’ll need for deployment.
+
+Run the Server: Make sure you have a Payara or GlassFish server set up in your IDE. Right-click the project and click "Run".
+
+Test the Base URL: Once it’s deployed, you can reach the API at:
+http://localhost:8080/SmartCampusAPI/api/v1
+
+
+
+3. Sample cURL Commands
+Here are five commands you can use to test the main features of the API. I’ve ordered them so you can see the full flow from discovery to deletion:
+
+Step 1: Check the Discovery Link
+curl -X GET http://localhost:8080/SmartCampusAPI/api/v1
+
+Step 2: Create a Room (R1)
+curl -X POST -H "Content-Type: application/json" -d '{"id":"R1", "name":"Main Lab"}' http://localhost:8080/SmartCampusAPI/api/v1/rooms
+
+Step 3: Link a Sensor (S1) to that Room
+curl -X POST -H "Content-Type: application/json" -d '{"id":"S1", "type":"CO2"}' http://localhost:8080/SmartCampusAPI/api/v1/rooms/R1/sensors
+
+Step 4: Add a Reading to the Sensor
+curl -X POST -H "Content-Type: application/json" -d '{"id":"RD1", "value":450.0}' http://localhost:8080/SmartCampusAPI/api/v1/sensors/S1/readings
+
+Step 5: Try to Delete the Room (Safety Logic Check)
+curl -X DELETE http://localhost:8080/SmartCampusAPI/api/v1/rooms/R1
+
+
+
+
+Questions:
+Part 1 
+
+1- Question: In your report, explain the default lifecycle of a JAX-RS Resource class. Is a new instance instantiated for every incoming request,
+or does the runtime treat it as a singleton? Elaborate on how this architectural decision impacts the way you manage 
+and synchronize your in-memory data structures (maps/lists) to prevent data loss or race conditions. 
+
+ 
+
+In my implementation, the JAX-RS resource classes follow a per-request lifecycle, meaning the server creates a totally new instance of the class every time 
+an HTTP request hits the endpoint. While this keeps things clean and isolated for the server, it actually created a bit of a challenge for my data storage. 
+Since I’m not using a persistent database, any data stored in standard instance variables would just disappear the moment the request finished.
+To get around this and prevent data loss, I had to use static collections (like my GenericDAO lists) to ensure the sensor and room data stayed in memory even
+after the resource instance was destroyed. Using static structures like this meant I had to be careful about synchronization; since multiple requests might
+try to access or modify the lists at the exact same time, I used static final lists to provide a consistent data entry point and help avoid race conditions
+or threading issues during runtime. 
+
+ 
+
+2-Question: Why is the provision of ”Hypermedia” (links and navigation within responses) considered a hallmark of advanced RESTful design (HATEOAS)?
+How does this approach benefit client developers compared to static documentation? 
+
+ 
+
+Providing hypermedia links (HATEOAS) in the Discovery endpoint is basically a hallmark of advanced RESTful design because it makes the API "self-explanatory."
+Instead of the client developer having to constantly refer back to a static PDF or a documentation website to figure out the next URL, the API response itself
+acts as a map. By including links like {"rooms": "/api/v1/rooms"}, I’m letting the client navigate the system dynamically. This is a huge benefit for developers
+compared to static docs because it decouples the client from the server’s specific URL structure. If I ever need to change a path or version an endpoint,
+I can update the link in the Discovery response, and any well-built client following those links won't break. It basically turns the API into something discoverable
+and browseable rather than just a list of hard-coded strings. 
+
+ 
+
+Part 2  
+
+1- Question: When returning a list of rooms, what are the implications of returning only IDs versus returning the full room objects? Consider network bandwidth 
+and client side processing 
+
+When I was looking at whether to return just the room IDs or the full room objects in a list, it really came down to a trade-off between speed and convenience. 
+If the API only sends back a list of IDs, the response is super small, which is great for saving network bandwidth. 
+The downside is that it makes the API a bit "chatty"—the client developer then has to do a bunch of extra work, making a separate GET request for every single 
+room just to see the details. I decided to return the full objects because it’s way more helpful for the client to get all the data in one shot without the 
+extra processing. It’s a bit more data over the wire, but for the scale of this project, it makes the dev experience much smoother than having to loop through 
+dozens of individual ID calls. 
+
+ 
+
+2- Question: Is the DELETE operation idempotent in your implementation? Provide a detailed justification by describing what happens if a client mistakenly sends
+the exact same DELETE request for a room multiple times. 
+
+ 
+
+In my implementation, the DELETE operation is idempotent, which is basically the standard for RESTful services. This means that if a client sends the exact same
+DELETE request for a room multiple times—maybe because of a network glitch or an accidental double-click—the final state of the server doesn't change after that
+first successful call. The first time they send it, the server finds the room and removes it (as long as it passes the safety check I added to make sure it
+doesn't have active sensors). If they send the same request again, the room is already gone, so the code just returns a 404 Not Found. Even though the response
+code changes from a 204 or 200 to a 404, the data on the server stays exactly the same after that first delete. It’s a really important feature because it makes
+the API much more resilient and prevents "double deletion" errors from messing with the system state. 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Part 3 
+
+1- Question: We explicitly use the @Consumes (MediaType.APPLICATION_JSON) annotation- on the POST method.
+Explain the technical consequences if a client attempts to send data in a different format, such as text/plain or application/xml.
+How does JAX-RS handle this mismatch? 
+
+ 
+
+By adding @Consumes(MediaType.APPLICATION_JSON) to my POST method, I’m basically setting a hard rule for what the API will actually accept.
+If a client tries to send data in a different format—like text/plain or application/xml—the technical consequence is that
+JAX-RS will block the request immediately before it even hits my business logic.
+It handles this mismatch by returning a 415 Unsupported Media Type error. This is honestly a lifesaver because it means I don't have to write
+manual checks to see if the data is valid JSON; the framework handles the "gatekeeping" for me.
+It keeps the communication between the client and server consistent and prevents the app from crashing because it's trying to parse a format
+it wasn't designed to handle. 
+
+ 
+
+2- Question: You implemented this filtering using @QueryParam. Contrast this with an alternative design where the type is part of the 
+URL path(e.g., /api/vl/sensors/type/CO2). Why is the query parameter approach generally considered superior for filtering and searching 
+collections? 
+
+I decided to use the @QueryParam approach for filtering by sensor type (like ?type=CO2) because it's way more flexible than trying to build the type directly
+into the URL path. If I had put the type in the path—like /sensors/type/CO2—it makes it look like "type" is its own specific resource, which isn't really the case.
+In REST, the path should usually represent the actual "thing" you're looking at, while query parameters are meant for sorting or narrowing down that list.
+Using query parameters also makes it a lot easier if I wanted to add more filters later, like searching by status or date, without creating a bunch of messy
+and complicated URL combinations. It keeps the main endpoint clean and follows the standard way of handling searches in a professional API. 
+
+ 
+
+ 
+
+ 
+
+ 
+
+Part 4 
+
+1- Question: Discuss the architectural benefits of the Sub-Resource Locator pattern. How does delegating logic to separate classes help manage complexity in
+large APIs compared to defining every nested path (e.g., sensors/{id}/readings/{rid}) in one massive controller class? 
+
+Using the Sub-Resource Locator pattern (delegating the /readings path to a separate SensorReadingResource class) has some big architectural benefits, especially
+when it comes to keeping the project organized. If I had tried to cram every single nested path—like rooms, sensors, and all their historical readings—into one
+giant controller class, the code would have become a total mess and really hard to debug. By delegating the logic to separate classes, I’m basically following the
+"Single Responsibility Principle." Each class only has to worry about its own specific part of the API. This makes the whole system much easier to manage as it 
+grows, because if I need to change how readings are handled, I know exactly which file to go to without accidentally breaking the sensor or room logic. It just 
+keeps the code cleaner, more modular, and way more readable. 
+
+ 
+
+2- 
+
+ 
+
+Part 5 
+
+2- Question: Why is HTTP 422 often considered more semantically accurate than a standard 404 when the issue is a missing reference inside a valid JSON payload? 
+
+ 
+
+When a client tries to POST a new sensor but includes a roomId that doesn't actually exist in the system, using an HTTP 422 Unprocessable Entity is way more
+semantically accurate than just a standard 404. In most REST APIs, a 404 usually means the actual URL or the endpoint itself is missing, but here, 
+the endpoint is fine and the JSON data is formatted correctly. The real problem is that the data inside that JSON is logically "broken" because it's pointing 
+to a room that isn't there. By returning a 422, I’m giving the developer a much clearer hint that their request was received and understood, but it just 
+can’t be processed because of that specific validation failure. It makes debugging a lot easier for the client compared to getting a generic "not found" error 
+which might make them think the whole /sensors path is broken. 
+
+ 
+
+4-Question: From a cybersecurity standpoint, explain the risks associated with exposing internal Java stack traces to external API consumers. What specific
+information could an attacker gather from such a trace? 
+
+From a cybersecurity standpoint, letting internal Java stack traces leak out to external users is a massive risk because it basically gives an attacker a
+"roadmap" of how the server actually works. If something crashes and the API returns a raw error instead of a clean message, an attacker can see things like
+specific class names, exactly which library versions I’m using, and even the file paths on the server where the code is sitting. They could then use that info
+to target known vulnerabilities in those specific libraries or figure out how to exploit my database logic. By using a "catch-all" ExceptionMapper that just sends
+back a generic 500 Internal Server Error, I’m making sure the sensitive details stay hidden and an attacker doesn't get any extra info they could use to plan a
+targeted attack. 
+
+ 
+
+5-Question: Why is it advantageous to use JAX-RS filters for cross-cutting concerns like logging, rather than manually inserting Logger.info() statements
+inside every single re- source method? 
+ 
+
+ 
+
+It’s much better to use JAX-RS filters for things like logging because they handle "cross-cutting concerns" in one single place. If I didn't use a filter,
+I’d have to manually paste Logger.info() statements into every single GET, POST, and DELETE method across all my different resource classes. That would be a
+total nightmare to maintain, and it’s way too easy to forget one. By using a ContainerRequestFilter and a ContainerResponseFilter, I can automatically intercept
+every single request and response that hits the API. It keeps my actual business logic clean and focused, and it guarantees that the logging is consistent
+for the whole system without me having to repeat the same code over and over again. 
+
+ 
