@@ -1,0 +1,459 @@
+BaseMode.java
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus;
+
+/**
+ *
+ * @author bh603
+ */
+
+public interface BaseModel {
+    String getId();
+    void setId(String id);
+}
+
+
+
+
+DiscoveryInfo.java
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus;
+import java.util.HashMap;
+import java.util.Map;
+/**
+ *
+ * @author bh603
+ */
+public class DiscoveryInfo {
+    private String version = "1.0";
+    private String description = "Smart Campus Sensor";
+    private String contact = "w2116278@westminster.ac.uk";
+    private HashMap<String, String> links = new HashMap();
+   
+    
+    public DiscoveryInfo() {
+      links.put("rooms", "/api/v1/rooms");
+      links.put("sensors", "/api/v1/sensors");
+    }
+    
+}
+
+GenericDAO.java
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus;
+
+import java.util.ArrayList;
+import java.util.List;
+/**
+ *
+ * @author bh603
+ * @param <T>
+ */
+public class GenericDAO<T extends BaseModel> {
+    
+    private  List<T> items  = new ArrayList<>();
+    
+    public GenericDAO(List<T> items) {
+        this.items = items;
+    }
+    public List<T> getAll() {
+        return items;
+    }
+    
+    public void add(T item) {
+        items.add(item);
+    }
+    
+    public void delete(String id) {
+        items.removeIf(item -> item.getId().equals(id));
+        }
+    
+    
+    public T getById(String id) {
+    return items.stream()
+            .filter(item -> item.getId().equals(id))
+            .findFirst()
+            .orElse(null);
+      }
+
+}   
+
+
+    
+   
+
+JakartaRestConfiguration.java
+package com.mycompany.smartcampus;
+
+
+import jakarta.ws.rs.ApplicationPath;
+import jakarta.ws.rs.core.Application;
+
+
+/**
+ * Configures Jakarta RESTful Web Services for the application.
+ * @author Juneau
+ */
+@ApplicationPath("/api/v1")
+public class JakartaRestConfiguration extends Application {
+   
+    
+  }
+
+Metadata.java
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ *
+ * @author bh603
+ */
+public class Metadata {
+    private String version = "1.0";
+    private String author = "Hussain Bhatoo";
+    private Map<String, String> links = new HashMap<>();
+}
+
+Room.java
+
+
+
+Sensor.java
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus;
+
+/**
+ *
+ * @author bh603
+ */
+public class SensorReading implements BaseModel {
+    private String id;
+    private String sensorId;
+    private double value;
+    private long timestamp;
+    
+    public SensorReading() {}
+            
+    public void setSensorId(String sensorId) {
+        this.sensorId = sensorId;
+    }
+
+
+    @Override
+    public void setId(String newId) {
+        this.id = newId;
+    }
+    
+  
+    public void setTimestamp(long newTimestamp) {
+        this.timestamp = newTimestamp;
+    }
+    
+    public void setValue(double newValue) {
+        this.value= newValue;
+    }
+    
+    //setters
+   
+    @Override
+    public String getId() {
+        return id;
+    }
+    
+    public double getValue() {
+        return value;
+    }
+    
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public String getSensorId() {
+        return sensorId;
+    }
+    
+    //getters
+}
+
+
+
+com.mycompany.smartcmapus.exceptions
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import com.mycompany.smartcampus.resources.ErrorMessage;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+import java.util.logging.Logger;
+/**
+ *
+ * @author bh603
+ */
+@Provider
+public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
+    
+    private final static Logger logger = Logger.getLogger(GlobalExceptionMapper.class.getName());
+    
+    @Override
+    public Response toResponse(Throwable exception) {
+        ErrorMessage error = new ErrorMessage(
+              exception.getMessage(),
+              500,
+              "An internal server error has occured. Please try again",
+              "https://smartcampus.com/docs/errors/500"
+        );
+        
+        
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity(error)
+            .build();
+                
+        
+    }
+}
+
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+/**
+ *
+ * @author bh603
+ */
+public class LinkedResourceNotFoundException extends RuntimeException {
+    public LinkedResourceNotFoundException (String message) {
+        super(message);
+    }
+
+   }
+
+    
+   
+
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import com.mycompany.smartcampus.resources.ErrorMessage;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+
+/**
+ *
+ * @author bh603
+ */
+@Provider  //annotation which registers the mapper with JAX-RS
+public class LinkedResourceNotFoundExceptionMapper implements ExceptionMapper<LinkedResourceNotFoundException> {
+    
+    @Override
+    public Response toResponse(LinkedResourceNotFoundException exception) {
+        ErrorMessage error = new ErrorMessage(
+                exception.getMessage(),
+                422,
+                "https://smartcampus.com/docs/errors/422"
+        );
+        
+        return Response.status(422)
+            .entity(error)
+            .build();
+                
+        
+    
+    
+    }
+
+    
+    
+    
+    
+}
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import com.mycompany.smartcampus.resources.ErrorMessage;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status;
+/**
+ *
+ * @author bh603
+ */
+public class RoomNotEmptyException extends RuntimeException {
+    public RoomNotEmptyException(String message) {
+        super(message);
+    }
+
+    void getMessage(ErrorMessage errorMessage) {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    }
+    
+}
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import com.mycompany.smartcampus.resources.ErrorMessage;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.core.Response.Status;
+
+/**
+ *
+ * @author bh603
+ */
+
+@Provider
+public class RoomNotEmptyExceptionMapper implements ExceptionMapper<RoomNotEmptyException> {
+    
+    
+    @Override
+    public Response toResponse(RoomNotEmptyException exception) {
+        ErrorMessage errorMessage = new ErrorMessage(
+            exception.getMessage(),
+            409,
+            "https://smartcampus.com/docs/errors/409"
+        );
+    
+        return Response.status(Response.Status.CONFLICT)
+            .entity(errorMessage)
+            .build();
+    }
+}   
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+/**
+ *
+ * @author bh603
+ */
+public class SensorUnavailableException extends RuntimeException {
+    public SensorUnavailableException (String message) {
+        super(message);
+    }
+}
+
+
+
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.exception;
+
+import com.mycompany.smartcampus.resources.ErrorMessage;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.ext.Provider;
+
+/**
+ *
+ * @author bh603
+ */
+@Provider
+public class SensorUnavailableExceptionMapper implements ExceptionMapper <SensorUnavailableException> {
+    
+    @Override
+    public Response toResponse(SensorUnavailableException exception) {
+           ErrorMessage error = new ErrorMessage(
+                exception.getMessage(),
+                403,
+                "https://smartcampus.com/docs/errors/403"
+        );
+        
+        return Response.status(Response.Status.FORBIDDEN)
+            .entity(error)
+            .build();
+                
+        
+    
+    }
+    
+}
+
+
+
+
+
+
+
+
+    
+
+
+
+
