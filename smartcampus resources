@@ -1,0 +1,362 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.resources;
+
+import com.mycompany.smartcampus.DiscoveryInfo;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+
+
+@Path("/")
+public class DiscoveryResource {
+ 
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public DiscoveryInfo getDiscovery() {
+        return new DiscoveryInfo();
+    }
+            
+
+}
+
+
+
+
+package com.mycompany.smartcampus.resources;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.Response;
+
+/**
+ *
+ * @author 
+ */
+@Path("jakartaee11")
+public class JakartaEE11Resource {
+    
+    @GET
+    public Response ping(){
+        return Response
+                .ok("ping Jakarta EE")
+                .build();
+    }
+}
+
+
+
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.resources;
+
+import java.util.ArrayList;
+import java.util.List;
+import com.mycompany.smartcampus.GenericDAO;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType; 
+import jakarta.ws.rs.core.Response;
+
+/**
+ *
+ * @author bh603
+ */
+
+
+
+@Path("/rooms")
+public class RoomResource {
+
+    public static final GenericDAO<Room> roomDAO = new GenericDAO<>(new ArrayList<>());
+    
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<Room> getRoom() {
+        return roomDAO.getAll();
+    }
+    
+    
+    
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response addRoom(Room room) {
+        roomDAO.add(room);
+        return Response.status(Response.Status.CREATED).entity(room).build();
+    }
+    
+    @DELETE
+    @Path("/{id}")
+    public Response deleteRoom(@PathParam("id") String id) {
+        // 1. Fetch the room
+        Room room = roomDAO.getById(id);
+
+        // 2. Path A: Room doesn't exist (returns 404)
+        if (room == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+
+        // 3. Path B: Room has sensors (Safety Logic - returns 400)
+        // Note: Use !isEmpty() to check if sensors ARE assigned
+        if (room.getSensorIds() != null && !room.getSensorIds().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Cannot be deleted. Room has sensors assigned to it")
+                    .build();
+        }
+
+        // 4. Path C: Safe to delete (returns 204)
+        roomDAO.delete(id);
+        return Response.noContent().build();
+    }
+  }
+
+    
+    
+    
+    
+    //public delete(@PathParam("id")String id) {
+      //  return RoomResource.Instance.deleteRoomid(id);
+        //roomDAO.delete(id);
+    //}
+
+
+
+
+    /*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.resources;
+
+import com.mycompany.smartcampus.GenericDAO;
+import com.mycompany.smartcampus.Sensor;
+import com.mycompany.smartcampus.SensorReading;
+import com.mycompany.smartcampus.exception.LinkedResourceNotFoundException;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ *
+ * @author bh603
+ */
+@Path("/sensors/{sensorId}/readings")
+public class SensorReadingResource {
+    private static final GenericDAO<SensorReading> sensorReadingDAO = new GenericDAO<>(new ArrayList<>());
+    private static final GenericDAO<Sensor> sensorDAO = new GenericDAO<>(new ArrayList<>());
+    
+    @PathParam("sensorId")
+    private String sensorId;
+   
+            
+    public SensorReadingResource() {}
+
+    
+     
+    
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getReadings(@PathParam("sensorId") String sensorId) {
+        List<SensorReading> filteredList = sensorReadingDAO.getAll().stream()   
+            .filter(reading -> reading.getSensorId() != null && reading.getSensorId().equals(sensorId))
+            .collect(Collectors.toList());
+            
+            if (filteredList == null) {
+                throw new LinkedResourceNotFoundException("No readings found for this sensor" + sensorId);
+            }
+            return Response.ok(filteredList).build();
+    }
+    
+    
+   
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response addReading(@PathParam("sensorId") String sensorId, SensorReading newReading) {
+        
+        newReading.setSensorId(sensorId);
+        
+        Sensor parentSensor = sensorDAO.getById(sensorId);
+        
+        if (parentSensor == null) {
+            //throw new LinkedResourceNotFoundException("Sensor" + this.sensorId + "was not found");
+            return Response.status(Response.Status.NOT_FOUND)
+                .entity("Error: Sensor " + sensorId + "was not found")
+                .build();
+        }
+               
+        if ("MAINTENANCE".equalsIgnoreCase(parentSensor.getStatus())) {
+            //throw new SensorUnavailableException(this.sensorId + " sensor is under maintenance" );
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity("Error: Sensor is currently under maintenance")
+                    .build();
+            //parentSensor.setCurrentValue(newReading.getValue());
+        }
+        
+        sensorReadingDAO.add(newReading); 
+        return Response.status(201).entity(newReading).build();
+    }
+    
+    
+    
+     
+    
+    
+    
+
+      
+    
+    
+    
+    
+    
+}
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.resources;
+
+import jakarta.ws.rs.core.MediaType;
+import com.mycompany.smartcampus.GenericDAO;
+import com.mycompany.smartcampus.Sensor;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam; 
+import jakarta.ws.rs.core.Response;
+import java.util.ArrayList;
+import java.util.stream.Collectors;
+import java.util.List;
+/**
+/**
+ *
+ * @author bh603
+ */
+
+@Path("/sensors")
+public class SensorResource {
+
+    private static final GenericDAO<Sensor> sensorDAO = new GenericDAO<>(new ArrayList<>());
+    private static final GenericDAO<com.mycompany.smartcampus.resources.Room> roomDAO = RoomResource.roomDAO;
+    
+    
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getSensors(@QueryParam("type") String type) {
+        List<Sensor> sensors = sensorDAO.getAll();
+        
+        if(type == null || type.isEmpty()) {
+            return Response.ok(sensors).build();
+        } else  {
+            List<Sensor> filteredlist = sensors.stream()
+                .filter(sensor -> sensor.getType().equalsIgnoreCase(type))
+                .collect(Collectors.toList());
+        
+            return Response.ok(filteredlist).build();
+        }
+        
+    }
+    
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response addSensor(Sensor sensor) {
+      if (roomDAO.getById(sensor.getRoomId()) == null) {
+          return Response.status (Response.Status.NOT_FOUND)
+                  .entity(sensor.getRoomId() + "Error: Room Id doesn't exist" )
+                  .build();
+      
+              
+     }
+     sensorDAO.add(sensor);
+     return Response.status(Response.Status.CREATED)
+             .entity(sensor)
+             .build();
+     
+    
+    }
+
+ 
+    
+
+}
+
+
+
+
+
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.smartcampus.resources;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+/**
+ *
+ * @author bh603
+ */
+
+
+@Path("/api/v1/rooms")
+public class SensorRoom {
+ 
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getAllRooms() {
+        return Response.ok().build();
+    }
+            
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
